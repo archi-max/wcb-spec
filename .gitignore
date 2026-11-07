@@ -1,0 +1,11 @@
+upstream/
+LOCAL_NOTES.md
+*.o
+*.out
+*.wcb
+.DS_Store
+/bench
+/tvalid
+/tbound
+/layout_check
+/wcbcheck
