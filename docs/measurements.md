@@ -30,7 +30,7 @@ Memory: one shared workspace per thread, 9.7 MiB (sized by the widest block seen
 
 - Encoder CPU on already-decoded streams. VPI capture cost is not included (separate measurements: callback-supplied values ~0.10 µs/callback, explicit value/time reads ~0.22).
 - Beating FSDB's native writer (0.80–0.85 µs/change) end to end needs the same design, signals, semantics and host, capture included. That is not yet measured.
-- It still retains all compressed blocks until `finish()`, as wcb.h does. Streaming and flushing on byte or latency budgets is a WCB3 item.
+- It still retains all compressed blocks until `finish()`, as wcb.h does. Streaming, with flushes triggered by change count or simulation time, is a WCB3 item.
 - 234 streams from the same synthetic designs; not independent real IPs.
 
 ## Reproduce

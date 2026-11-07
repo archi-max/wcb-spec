@@ -2,7 +2,7 @@
 
 This document specifies the custom waveform format used by our waveform-store research. It is written so that a writer can be built directly from VCS through VPI (a VPI plugin that captures value changes and hands them to a custom serializer), with no FSDB written first.
 
-It describes the format **as implemented in `src/wcb.h`** (magic `WCB2`, md5 `aa7b2a00`), plus two optional study codecs (`split.h` changed-field coding, `dom.h` shared clock-domain timestamps). Every statement carries one of these labels:
+It describes the format **as implemented in `src/wcb.h`** (magic `WCB2`, md5 `3ccaf977`, the hardened reader), plus two optional study codecs (`split.h` changed-field coding, `dom.h` shared clock-domain timestamps). Every statement carries one of these labels:
 
 - **Implemented:** in `wcb.h` today. Round trips verified bit-exact (hash per signal) on 1.78 G changes from real FSDB dumps.
 - **Study codec:** the code exists and is verified, but there is no on-disk container for it yet.
@@ -204,12 +204,17 @@ Recommended `lodBase`: 32 clock cycles. At an 8-cycle base the LOD was about 45%
 
 A reader may be given truncated, corrupt or hostile files, so it must reject them without reading out of bounds. Failure is atomic: a block that fails returns nothing, never a partial result.
 
-**Current `wcb.h` (implemented):**
-- `View::open` checks header and index bounds against the file size.
-- `decodeBlock` returns false on a zstd error, a decompressed size ≠ `rsize`, `mode > 1`, a varint or payload overrun (varints bounded to 10 bytes), a DICT index out of range, or `off + csize` past the end of the file.
-- `tests/tvalid.cpp`: 6/6 crafted faults are rejected. Of 3,000 random bit flips, about 2/3 are rejected and the rest decode to other values (there is no checksum, §6), with no crash.
+**Current `wcb.h` (implemented, hardened 2026-11-07, md5 `3ccaf977`):**
+- strict LEB128: rejects truncated input, more than 10 bytes, a 10th byte above 1, and overlong encodings;
+- `View::open` validates the header and every block, level and chunk index entry with overflow-safe bounds, and budgets of 2^24 events per block, 1 GiB decoded and `vlen ≤ 2^20`;
+- the frame content size must equal `rsize`; `t[0]` must equal `BlkEnt.t0`; u64 time overflow is rejected; the last time must be ≤ `tlast`; the payload length must be exact;
+- `decodeLod` validates the same way and returns bool; on any failure the output is cleared.
 
-**Full rule set (implemented in `src/variants/wcb.fold.h`, the newest reader; candidate for WCB2's normative reader).**
+Verification: 43 crafted cases pass under ASan + UBSan and Valgrind (the pre-hardening reader, `src/variants/wcb.prehard.h`, fails them). Random-mutation fuzzing under ASan, 6 × 1,800 CPU-s over the open, block and LOD targets (7.7 M iterations), found 0 memory errors and 0 real violations. All 6,998 real stores tested open with no rejects. `tests/tvalid.cpp`: 6/6 crafted faults rejected; of 3,000 random bit flips, about 2/3 are rejected and the rest decode to other values (there is no checksum, §6), with no crash. Cost (final interleaved run): block decode +6–10% per value (corpus 0.0224 → 0.0238 µs), LOD items +29–35%; most of it is the XOR row loop, which no longer vectorizes.
+
+On an empty stream (`nblk = 0`), `blockAt`/`blockFirst` return 0, so check `nblk` before decoding; `decodeBlock` rejects an index ≥ `nblk`.
+
+**Full rule set (first written for `src/variants/wcb.fold.h`; the hardened `wcb.h` applies the same checks).**
 - It decodes all 234 corpus files.
 - It was fuzzed under ASan on the Linux host (from that run's output; not re-run for this revision). 250,000 iterations over 74 seeds mutated raw files, index fields and payloads. Of these, 1,584,093 blocks and 410,684 LOD chunks decoded, with **0 invariant violations**.
 
@@ -360,7 +365,7 @@ These numbers come from one synthetic design. Real-design (CVA6) measurements ar
 | Same-time ordering across signals | Per-signal streams keep their own order but can't rebuild the interleaving between signals at one timestamp. If delta-cycle or event-order views need it, add a global sequence number per change or per timestamp group, optionally, as FSDB does. | open |
 | Streaming and recovery | `Encoder` keeps all compressed data in memory until `finish()`. Native capture needs bounded memory, incremental writes, and finalization that can be recovered after a crash (item 6 below). | open |
 | Other data types | Fixed-width logic planes don't cover real/string values, strength, named events, dynamic objects or transactions. Exclude these explicitly from an initial "RTL profile" and reject them at the writer, rather than dropping them silently. | open |
-| Reader validation | The original `decodeBlock`/`View` didn't bound offsets, sizes, varints or DICT indexes, ignored zstd return codes, and treated any mode ≠ 0 as DICT. | **done in current `wcb.h`** (§4.1); the stricter `fold` rules are not yet merged |
+| Reader validation | The original `decodeBlock`/`View` didn't bound offsets, sizes, varints or DICT indexes, ignored zstd return codes, and treated any mode ≠ 0 as DICT. | **done:** hardened `wcb.h` (§4.1) |
 | Window queries | The block-boundary bug in §4. | **fixed** (`blockFirst`, `tbound` passes) |
 
 **Performance rule for every WCB3 change: never worse than FSDB.** Measure each addition on the same samples (the 8-struct same-sample set, plus a whole-file run) for size, encode, decode, and point/window query latency, against FSDB on the same host. It must stay at or better than FSDB on **all four**; if it can't, it is optional and off by default.
@@ -387,7 +392,7 @@ These numbers come from one synthetic design. Real-design (CVA6) measurements ar
 6. **Streaming finish:** a VPI writer needs time-interval flushes (e.g. every 1% of the run) and an append-only layout, with the index written at close and recoverable after a crash. Peak buffer memory for many signals must be measured. *Open.* (Measured today: about 9.7 MiB of shared workspace per thread; the busiest wide signal's encoder holds 2.3 MiB.)
 7. **Encoder ZSTD_CCtx leak** (~4 MB per encoder). *Fixed:* one context per thread.
 8. **Encoder speed:** byte-by-byte candidate building. *Fixed:* a single-pass, word-wise builder, byte-identical output.
-9. **Variant drift:** the `fold` reader (strict varints, full index validation) and the `wcb.h` in `src/` have diverged. Merge them into one header before WCB3 work starts. *Open.*
+9. **Variant drift:** the `fold` reader (strict varints, full index validation) and the `wcb.h` in `src/` have diverged. *Done:* the hardened `wcb.h` has the strict reader; `fold.h` is kept for its experimental fold work.
 
 ## 10. Writing from VPI: mapping to a VPI capture hook
 
@@ -408,9 +413,11 @@ These numbers come from one synthetic design. Real-design (CVA6) measurements ar
 
 | File | md5 (8) | What |
 |---|---|---|
-| `src/wcb.h` | `aa7b2a00` | **Current.** Header, block index, LOD, `Encoder` (fast path, per-thread CCtx, fmix64 DICT slots), `View` (`blockAt`, `blockFirst`), validating `decodeBlock`/`decodeLod`.  |
-| `src/wcbfast.h` | `1e3dc535` | **Current fast encoder** (latest: fmix64 DICT slots + LOD shift), same output; `Policy::Preserve` (default) or `SkipNoRepeat`. Earlier `wcbfast.h` copies without those two fixes (e.g. md5 `4ad906a8`) are obsolete. |
-| `src/variants/wcb.fold.h` | `29189c4d` | Newest reader: the full §4.1 rules. Also experimental fold work. |
+| `src/wcb.h` | `3ccaf977` | **Current (hardened 2026-11-07).** Header, block index, LOD, `Encoder` (wcbfast workspace, fmix64 DICT slots, LOD shift), `View` (`blockAt`, `blockFirst`), strict validating `View::open`/`decodeBlock`/`decodeLod` (§4.1). |
+| `src/variants/wcb.prehard.h` | `aa7b2a00` | Previous `wcb.h`, before the reader hardening. |
+| `src/variants/wcbfast.prehard.h` | `1e3dc535` | Previous `wcbfast.h`. |
+| `src/wcbfast.h` | `bd2d9a7a` | **Current fast encoder** (latest: fmix64 DICT slots + LOD shift), same output; `Policy::Preserve` (default) or `SkipNoRepeat`. Earlier `wcbfast.h` copies without those two fixes (e.g. md5 `4ad906a8`) are obsolete. |
+| `src/variants/wcb.fold.h` | `29189c4d` | Where the §4.1 rules were first written. Also experimental fold work. |
 | `src/variants/wcb.shift.h` | `c7570e71` | `wcbfast` design merged into `wcb.h`, with the LOD shift trick. |
 | `src/variants/wcb.fair.h` | `7c6299cb` | Earlier validating version (the md5 the earlier draft cited). |
 | `src/variants/wcb.base.h` | `15808d70` | Original 160-line reference; the baseline "old `wcb.h`" timings. |

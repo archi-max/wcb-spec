@@ -44,7 +44,7 @@ Offline, Linux x86-64 host, 234 real WCB2 streams, µs/change. Full tables are i
 | Test | Result |
 |---|---|
 | Full readback, 4 M events (matched runs) | WCB 19–21× faster |
-| Decode CPU per value | FSDB 3.56 µs; WCB 0.082 µs (0.022 optimised); ~43× faster |
+| Decode CPU per value | FSDB 3.56 µs; WCB 0.082 µs (0.022 optimised); ~43× faster. The hardened reader (2026-11-07) costs 6–10% more per value (corpus 0.0224 → 0.0238 µs), still about 150× below FSDB (different sample set) |
 | Random point query, FSDB loading a window per query (matched runs) | FSDB 23–56 ms; WCB 1.1–3.5 ms; 7–50× faster |
 | Point query, all data resident in memory (matched runs) | WCB 6–8× faster |
 | One-time load before resident queries | FSDB 0.09–0.13 s; WCB 0.09–0.21 s; WCB is slower on the wide sets |

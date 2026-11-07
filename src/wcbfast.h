@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 the cmux sv-editor contributors
 // wcbfast.h: a faster WCB2 encoder. Same file format as wcb.h, so readers are unchanged.
 // API: init / change / finish / blkBytes / lodBytes, as wcb::Encoder (tested usage). Copyable and movable.
 //
