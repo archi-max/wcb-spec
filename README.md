@@ -6,6 +6,8 @@
 - reader validation, integrity, and the proposed container;
 - measured numbers and the WCB3 gap list.
 
+For the head-to-head numbers against FSDB, see [`docs/wcb-vs-fsdb.md`](docs/wcb-vs-fsdb.md).
+
 This spec is a revision of the project's earlier working draft. It adds byte-offset tables, exact LOD rules and the reader-validation rule set, updates the §9 status, and fixes source pointers.
 
 ## Layout
@@ -20,6 +22,7 @@ This spec is a revision of the project's earlier working draft. It adds byte-off
 | `tests/` | `bench.cpp` (old vs fast encoder: bytes, round trip, timing), `tvalid.cpp` (malformed-input rejection), `tbound.cpp` (same-time block-boundary windows). |
 | `tools/layout_check.cpp` | Struct sizes/offsets + 40K-change 4-state round trip. |
 | `tools/wcbcheck.cpp` | Whole-file validator: open, decode every block and LOD chunk, recheck n / t0 / tlast / stream hash. `-DWCB_H='"path/wcb.h"'` picks the reader version. |
+| `docs/wcb-vs-fsdb.md` | WCB vs FSDB summary: capture, encoder CPU, size, reads, checkpoints, and where WCB wins, ties and loses. |
 | `docs/measurements.md` | Fast-encoder results and review fixes (Linux x86-64 host, 234 streams). |
 
 ## Build and check

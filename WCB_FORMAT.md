@@ -322,6 +322,8 @@ Whole-signal codecs, stored as a pointer or parameters instead of blocks:
 
 ## 8. Measured numbers (synthetic SoC benchmark design; one design)
 
+For the full WCB vs FSDB summary (end-to-end VCS capture, reads, checkpoints), see [`docs/wcb-vs-fsdb.md`](docs/wcb-vs-fsdb.md).
+
 **Same 8 × 512-bit struct signals, same host (Xeon 4216, 2.1 GHz):**
 
 | | Bytes/change | Encode µs/change | Decode µs/value |
