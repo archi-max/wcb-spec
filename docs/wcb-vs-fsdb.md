@@ -16,6 +16,21 @@ Matched runs on one VCS host: the same design, signals and window, with native F
 
 At zstd-9 the files get smaller, but capture is slower than FSDB on the wide workloads: 4.5 s and 3.8 s, against FSDB's 3.0 s and 3.2 s. The counters stay close (0.98 s, with the hash fix applied).
 
+### 1.1 Real design: CVA6 (2026-11-07)
+
+CVA6 running CoreMark, first 500K cycles, 47 signals. The same `-debug_access+r` executable is used for every mode, on an exclusive host, with 3 shuffled reps; medians are given. Overhead is measured against the same run with no dump (52.09 s wall / 51.58 s CPU).
+
+| Mode | Wall overhead | CPU overhead | File size | Writer peak RSS |
+|---|---:|---:|---:|---:|
+| FSDB | +1.12 s (+2.2%) | +1.46 s (+2.8%) | 1,749,497 B | 254 MiB |
+| WCB, VPI value-change callbacks | +4.35 s (+8.4%) | +4.31 s (+8.4%) | 354,121 B | — |
+| WCB, DPI group tap | +1.89 s (+3.6%) | +1.87 s (+3.6%) | 347,873 B | — |
+| WCB, DPI group tap + background encode thread | **+0.86 s (+1.7%)** | **+1.23 s (+2.4%)** | **347,873 B** | **199 MiB** |
+
+- The best WCB mode costs slightly less than FSDB, and its file is 5.0× smaller. The rep ranges don't overlap FSDB's, but the margin is small: call it "at or slightly under FSDB" on this run.
+- The same capture modes passed strict, event-by-event comparisons against FSDB at 200K cycles (1,319,132 events). A glitch fixture (X/Z, force/release, #0 pulses, time-0 and final-tick changes) matched FSDB's glitch mode exactly (181,244 events). A kill -9 of the writing simulation recovered an exact prefix in 200/200 trials.
+- Not yet shown: validation of these exact 500K outputs, and scaling from 47 signals to a whole core's signal set.
+
 ## 2. Encoder CPU alone
 
 Offline, Linux x86-64 host, 234 real WCB2 streams, µs/change. Full tables are in [`measurements.md`](measurements.md).
@@ -37,6 +52,8 @@ Offline, Linux x86-64 host, 234 real WCB2 streams, µs/change. Full tables are i
 |---|---|
 | Matched VCS runs (§1) | WCB 21.5–73.5% smaller on every workload |
 | 512-bit structs, bytes per change (synthetic) | FSDB 1.344; WCB2 0.944; changed-field coding (study, spec §5.1) 0.539 |
+| Nine open-source designs, total (per-design table in the paper draft) | FSDB 2,267 MB; FSDB `-compact` 890 MB; FST 770.5 MB; WCZ 634.6 MB. WCZ is smaller than `-compact` on 9/9 (1.40× in total) and than FST on 8/9 (1.21× in total, 0.89–5.27× per design). FST settings are being re-checked, and FST at its strongest setting is being added |
+| CVA6 capture, 47 signals, 500K cycles (§1.1) | FSDB 1.75 MB; WCB 0.35 MB (5.0× smaller) |
 | Whole stored set of a 1.72 GB FSDB | 804 MB of WCB2 (2.1× smaller); *estimate* ~490–580 MB with the study codecs |
 
 ## 4. Reads
@@ -44,6 +61,7 @@ Offline, Linux x86-64 host, 234 real WCB2 streams, µs/change. Full tables are i
 | Test | Result |
 |---|---|
 | Full readback, 4 M events (matched runs) | WCB 19–21× faster |
+| Full scan of FSDB's stored signals only (38 signals, 4,216,962 changes, CVA6 1M-cycle capture, exclusive host, 3 × 10 scans, identical hash on every scan) | best FSDB configuration 0.318 s wall / 0.377 s CPU; WCB 0.033 / 0.032 s; **9.64× wall, 11.78× CPU** |
 | Decode CPU per value | FSDB 3.56 µs; WCB 0.082 µs (0.022 optimised); ~43× faster. The hardened reader (2026-11-07) costs 6–10% more per value (corpus 0.0224 → 0.0238 µs), still about 150× below FSDB (different sample set) |
 | Random point query, FSDB loading a window per query (matched runs) | FSDB 23–56 ms; WCB 1.1–3.5 ms; 7–50× faster |
 | Point query, all data resident in memory (matched runs) | WCB 6–8× faster |
@@ -79,6 +97,7 @@ These changes are in the viewer's FSDB fetch path, not in WCB. They set the base
 - full readback, about 20×;
 - decode CPU, about 40×;
 - resident point queries, 6–8×;
+- capture overhead on a real core (CVA6, 47 signals): at or slightly under FSDB, with a 5× smaller file (§1.1);
 - capture of wide vectors, 1.5–1.8×;
 - capture memory, about 4× less on the wide vectors;
 - checkpoints, by orders of magnitude (fork-save against blocking `$save`).
