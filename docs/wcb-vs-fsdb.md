@@ -75,7 +75,7 @@ The last row matters most for a viewer. Against a warm reader that is already lo
 | | Overhead |
 |---|---|
 | Blocking `$save` every 25K cycles | +103% wall (+25% in a second run configuration) |
-| Fork-save at the same interval | +0.2–0.4% wall; the parent pauses ~1.9 ms per save; no extra licence seat |
+| Fork-save at the same interval | +0.2–0.4% wall; the parent pauses ~1.9 ms per save |
 | Storage | 56 MB base plus 0.07–0.11 MB per checkpoint, stored as a delta |
 | Restore from base plus delta | 0.9–1.2 s, byte-identical |
 
