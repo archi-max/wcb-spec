@@ -19,7 +19,7 @@ This spec is a revision of the project's earlier working draft. It adds byte-off
 | `src/wcbfast.h` | Fast encoder, byte-identical output by default. |
 | `src/split.h`, `src/dom.h` | Study codecs: changed-field structs, shared clock-domain timestamps (spec §5). |
 | `src/variants/` | Other wcb.h versions; all write WCB2. `wcb.prehard.h` / `wcbfast.prehard.h` are the versions before the reader hardening. See spec §11. |
-| `tests/` | `bench.cpp` (old vs fast encoder: bytes, round trip, timing), `tvalid.cpp` (malformed-input rejection), `tbound.cpp` (same-time block-boundary windows). |
+| `tests/` | `bench.cpp` (old vs fast encoder: bytes, round trip, timing), `tvalid.cpp` (malformed-input rejection), `tbound.cpp` (same-time block-boundary windows), `tcf.cpp` and `tdom.cpp` (study-codec round trips). |
 | `tools/layout_check.cpp` | Struct sizes/offsets + 40K-change 4-state round trip. |
 | `tools/wcbcheck.cpp` | Whole-file validator: open, decode every block and LOD chunk, recheck n / t0 / tlast / stream hash. `-DWCB_H='"path/wcb.h"'` picks the reader version. |
 | `docs/wcb-vs-fsdb.md` | WCB vs FSDB summary: capture, encoder CPU, size, reads, checkpoints, and where WCB wins, ties and loses. |
@@ -31,6 +31,8 @@ This spec is a revision of the project's earlier working draft. It adds byte-off
 F="-std=c++17 -lzstd"            # macOS/Homebrew: add -I/opt/homebrew/include -L/opt/homebrew/lib
 g++ -O1 -fsanitize=address,undefined tests/tvalid.cpp $F -o tvalid && ./tvalid
 g++ -O1 -fsanitize=address,undefined tests/tbound.cpp $F -o tbound && ./tbound
+g++ -O1 -fsanitize=address,undefined tests/tcf.cpp $F -o tcf && ./tcf
+g++ -O1 -fsanitize=address,undefined tests/tdom.cpp $F -o tdom && ./tdom
 g++ -O2 tools/layout_check.cpp $F -o layout_check && ./layout_check
 g++ -O2 tools/wcbcheck.cpp $F -o wcbcheck && ./wcbcheck path/to/*.wcb
 g++ -O3 tests/bench.cpp $F -o bench && ./bench 9 16384 1 3 path/to/*.wcb
@@ -44,6 +46,8 @@ Last run, 2026-11-07, Apple M4 Pro, zstd 1.5.7, on a 234-file corpus of WCB2 str
 |---|---|
 | `tvalid` | PASS |
 | `tbound` | PASS (153/153 windows) |
+| `tcf` | PASS (300 random structs, 0 failures) |
+| `tdom` | PASS (6,000 cases, 0 failures) |
 | `layout_check` | Hdr 72 / BlkEnt 32 / LevEnt 16 / LodEnt 32; round trip OK |
 | `wcbcheck` with the current, pre-hardening, base and `fold` readers | 234/234 ok, 4,185,535 changes, hashes match |
 | `bench`, zstd-9 and zstd-3 | byte-identical 234/234, exit 0 |

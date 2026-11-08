@@ -424,4 +424,4 @@ These numbers come from one synthetic design. Real-design (CVA6) measurements ar
 | `tests/` | | `bench.cpp`, `tvalid.cpp`, `tbound.cpp`  |
 | `tools/` | | `layout_check.cpp` (struct sizes and round trip), `wcbcheck.cpp` (whole-file validator) |
 
-| `src/split.h`, `src/dom.h` | | Study codecs (§5), They compile against the current `wcb.h`; they were not re-verified here. |
+| `src/split.h`, `src/dom.h` | | Study codecs (§5). They compile against the current `wcb.h`. Round trips are checked by `tests/tcf.cpp` (changed-field coding, 2- and 4-state, multi-block, hash chain) and `tests/tdom.cpp` (all three time-header kinds, with off-edge escapes), both under ASan+UBSan. |
